@@ -105,6 +105,11 @@ static inline void pull_clock() {
   digitalWrite(CLOCK, LOW);
 }
 
+static inline void push_clock() {
+  pinMode(CLOCK, OUTPUT);
+  digitalWrite(CLOCK, HIGH);
+}
+
 static inline void release_clock() {
   pinMode(CLOCK, INPUT);
 }
@@ -238,12 +243,53 @@ int get_byte(uchar *output, int force_eoi) {
   return eoi;
 }
 
+int put_byte(uchar value, int eoi) {
+  int tmp;
+  int flag;
+  
+  delayMicroseconds(100);
+  tmp = data_active();
+  push_clock();
+  if(tmp) {
+    if(!wait_data(HIGH)) return 0;
+    flag = eoi;
+  } else {
+    flag = 1;
+  }
+  if(flag) {
+    if(!wait_data(HIGH)) return 0;
+    if(!wait_data(LOW)) return 0;
+  }
+
+  pull_clock();
+  if(!wait_data(HIGH)) return 0;
+
+  for(int i = 0; i<8; i++) {
+    delayMicroseconds(70);
+    if(data_active()) return 1;
+    if(value & (1<<i)) {
+      push_data();
+    } else {
+      pull_data();
+    }
+    push_clock();
+    delayMicroseconds(70);
+    pull_clock();
+    push_data();
+  }
+
+  delayMicroseconds(100);
+  if(!wait_data(LOW)) return 0;
+
+  return flag;
+}
+
 void handle_close(uchar sec_addr) {
   print_str("CLOSE: ");
   println_hex(sec_addr);
 }
 
-void handle_open(uchar sec_addr, uchar *iobuf, uchar max_len) {
+void handle_open(uchar sec_addr) {
   int a = 0;
   int eoi;
   print_str("OPEN: ");
@@ -257,7 +303,7 @@ void handle_open(uchar sec_addr, uchar *iobuf, uchar max_len) {
     a++;
     //    Serial.print("Count: ");
     //    Serial.println(a);
-  } while(!eoi && a < max_len-1);
+  } while(!eoi && a < sizeof(iobuf)-1);
   iobuf[a] = '\0';
   print_str("OPEN: Data == ");
   println_str((char *)iobuf);
@@ -266,12 +312,77 @@ void handle_open(uchar sec_addr, uchar *iobuf, uchar max_len) {
   }
   print_str("OPEN: Bytes received: ");
   println_dec(a);
-  Serial.print("OPEN: Bytes received: ");
-  Serial.println(a);
-  Serial.print("OPEN: Data == ");
-  Serial.println((char *)iobuf);
-  for(int i=0;i<a;i++) {
-    Serial.println(iobuf[i], HEX);
+  //  for(int i=0;i<a;i++) {
+  //    Serial.println(iobuf[i], HEX);
+  //  }
+}
+
+#define TITLE "TESTDIR"
+#define C64TYPE " PRG "
+#define BLKFREE "BLOCKS FREE."
+
+void send_dir_line(int *addr, char *filename, int size) {
+  int b;
+  int len;
+  b = 1;
+
+  if(size < 100) b++;
+  if(size < 10) b++;
+  len = strlen(filename)+2;
+  *addr += 26 + b;
+
+  put_byte(*addr, 0);
+  put_byte(*addr>>8, 0);
+  put_byte(size, 0);
+  put_byte(size>>8, 0);
+  for(int i=0;i<b;i++) put_byte(' ', 0);
+  put_byte('"', 0);
+  for(int i=0;i<len;i++) put_byte(filename[i], 0);
+  put_byte('"', 0);
+  for(int i=0;i<18-len;i++) put_byte(' ', 0);
+  for(int i=0;i<5;i++) put_byte(C64TYPE[i], 0);
+  put_byte(0, 0);
+}
+
+void send_dir() {
+  int addr = 0x0801;
+  int len;
+
+  put_byte(addr, 0);
+  put_byte(addr>>8, 0);
+  /* Title */
+  len = strlen((const char *)TITLE);
+  addr += len + 5;
+  put_byte(addr, 0);
+  put_byte(addr>>8, 0);
+  put_byte(0, 0);
+  put_byte(0, 0);
+
+  put_byte('\x12', 0);
+  put_byte('"', 0);
+  for(int i=0;i<len;i++) {
+    put_byte(TITLE[i], 0);
+  }
+  put_byte('"', 0);
+  put_byte(0, 0);
+  send_dir_line(&addr, "FILE 1", 123);
+  send_dir_line(&addr, "FILE 2", 12);
+  send_dir_line(&addr, "FILE 3", 3);
+  put_byte(addr, 0);
+  put_byte(addr>>8, 0);
+  put_byte(0xff, 0);
+  put_byte(0xff, 0);
+  for(int i=0;i<strlen((const char *)BLKFREE);i++) {
+    put_byte(BLKFREE[i], 0);
+  }
+  put_byte(0, 0);
+  put_byte(0, 0);
+  put_byte(0, 1);
+}
+
+void handle_talk(uchar sec_addr) {
+  if(strlen((const char *)iobuf) == 1 && iobuf[0] == '$') {
+    send_dir();
   }
 }
 
@@ -320,7 +431,7 @@ void handle_atn() {
   if(sec_mode == IEC_OPEN) {
     wait_atn(HIGH);
     sec_addr = sec & IEC_ADDRESS;
-    handle_open(sec_addr, iobuf, sizeof(iobuf));
+    handle_open(sec_addr);
   } else if(sec_mode == IEC_CLOSE) {
     sec_addr = sec & IEC_ADDRESS;
     handle_close(sec_addr);
@@ -337,7 +448,7 @@ void handle_atn() {
       release_data();
       pull_clock();
       delayMicroseconds(200);
-      // handle_talk();
+      handle_talk(sec_addr);
       release_data();
       release_clock();
     }
