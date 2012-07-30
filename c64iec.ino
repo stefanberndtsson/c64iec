@@ -328,7 +328,7 @@ void send_dir_line(int *addr, char *filename, int size) {
 
   if(size < 100) b++;
   if(size < 10) b++;
-  len = strlen(filename)+2;
+  len = strlen(filename);
   *addr += 26 + b;
 
   put_byte(*addr, 0);
@@ -339,7 +339,7 @@ void send_dir_line(int *addr, char *filename, int size) {
   put_byte('"', 0);
   for(int i=0;i<len;i++) put_byte(filename[i], 0);
   put_byte('"', 0);
-  for(int i=0;i<18-len;i++) put_byte(' ', 0);
+  for(int i=0;i<20-len;i++) put_byte(' ', 0);
   for(int i=0;i<5;i++) put_byte(C64TYPE[i], 0);
   put_byte(0, 0);
 }
