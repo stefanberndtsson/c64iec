@@ -27,6 +27,16 @@ typedef unsigned char uchar;
 int iec_mode = 0;
 uchar iobuf[255];
 
+uchar storage[512];
+int filesize[4];
+uchar filename[4*16];
+uchar testfile[34] = { 
+  0x01, 0x08, 0x16, 0x08, 0x0a, 0x00, 0x99, 0x20, 
+  0x22, 0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x20, 0x57, 
+  0x4f, 0x52, 0x4c, 0x44, 0x21, 0x22, 0x00, 0x1f, 
+  0x08, 0x14, 0x00, 0x89, 0x20, 0x31, 0x30, 0x00, 
+  0x00, 0x00 };
+
 // #define DEBUG 1
 
 static inline void print_str(char *str) {
@@ -365,9 +375,12 @@ void send_dir() {
   }
   put_byte('"', 0);
   put_byte(0, 0);
-  send_dir_line(&addr, "FILE 1", 123);
-  send_dir_line(&addr, "FILE 2", 12);
-  send_dir_line(&addr, "FILE 3", 3);
+  send_dir_line(&addr, "TESTFILE", 1);
+  for(int i=0;i<4;i++) {
+    if(filesize[i] > 0 && filename[i*16] != '\0') {
+      send_dir_line(&addr, (char *)&filename[i*16], (filesize[i]+127)/128);
+    }
+  }
   put_byte(addr, 0);
   put_byte(addr>>8, 0);
   put_byte(0xff, 0);
@@ -380,9 +393,6 @@ void send_dir() {
   put_byte(0, 1);
 }
 
-uchar storage[512];
-int filesize[4];
-uchar filename[4*16];
 
 void clear_filedata() {
   for(int i=0;i<sizeof(filename);i++) {
@@ -393,19 +403,21 @@ void clear_filedata() {
   }
 }
 
-uchar testfile[34] = { 
-  0x01, 0x08, 0x16, 0x08, 0x0a, 0x00, 0x99, 0x20, 
-  0x22, 0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x20, 0x57, 
-  0x4f, 0x52, 0x4c, 0x44, 0x21, 0x22, 0x00, 0x1f, 
-  0x08, 0x14, 0x00, 0x89, 0x20, 0x31, 0x30, 0x00, 
-  0x00, 0x00 };
-
 void send_testfile() {
   int eoi;
   for(int i=0;i<sizeof(testfile);i++) {
     eoi = 0;
     if(i == (sizeof(testfile)-1)) eoi = 1;
     put_byte(testfile[i], eoi);
+  }
+}
+
+void send_file(int filenum) {
+  int eoi;
+  for(int i=0;i<filesize[filenum];i++) {
+    eoi = 0;
+    if(i == (filesize[filenum]-1)) eoi = 1;
+    put_byte(storage[i+128*filenum], eoi);
   }
 }
 
@@ -465,6 +477,14 @@ void handle_talk(uchar sec_addr) {
     send_dir();
   } else if(strlen((const char *)iobuf) == 8 && !strcmp((const char *)iobuf, "TESTFILE")) {
     send_testfile();
+  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE1")) {
+    send_file(0);
+  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE2")) {
+    send_file(1);
+  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE3")) {
+    send_file(2);
+  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE4")) {
+    send_file(3);
   }
 }
 
@@ -550,6 +570,7 @@ void setup() {
   pinMode(AVR_TIMEOUT, OUTPUT);
 
   clear_iobuf();
+  clear_filedata();
 
   //  digitalWrite(AVR_DEBUG, HIGH);
   pull_clock();
