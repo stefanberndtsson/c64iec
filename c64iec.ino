@@ -380,6 +380,19 @@ void send_dir() {
   put_byte(0, 1);
 }
 
+uchar storage[512];
+int filesize[4];
+uchar filename[4*16];
+
+void clear_filedata() {
+  for(int i=0;i<sizeof(filename);i++) {
+    filename[i] = '\0';
+  }
+  for(int i=0;i<4;i++) {
+    filesize[i] = 0;
+  }
+}
+
 uchar testfile[34] = { 
   0x01, 0x08, 0x16, 0x08, 0x0a, 0x00, 0x99, 0x20, 
   0x22, 0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x20, 0x57, 
@@ -393,6 +406,57 @@ void send_testfile() {
     eoi = 0;
     if(i == (sizeof(testfile)-1)) eoi = 1;
     put_byte(testfile[i], eoi);
+  }
+}
+
+void recv_file(int filenum, const char *name) {
+  int a;
+  int eoi = 0;
+
+  strcpy((char *)&filename[filenum*16], name);
+
+  a = 0;
+  do {
+    if(atn_active()) return;
+    eoi = get_byte(&storage[a+filenum*128], 0);
+    a++;
+  } while (!eoi && a < sizeof(storage)/4-1);
+
+  if(a >= sizeof(storage)/4-1) {
+    Serial.println("DEBUG: SAVE Exceeded storage...");
+  }
+
+  filesize[filenum] = a;
+}
+
+void handle_listen(uchar sec_addr) {
+  int filenum;
+
+  if(sec_addr != 1) {
+    // Only supporting SAVE
+    return;
+  }
+
+  filenum = -1;
+  if(!strcmp((const char *)iobuf, "FILE1")) filenum = 0;
+  if(!strcmp((const char *)iobuf, "FILE2")) filenum = 1;
+  if(!strcmp((const char *)iobuf, "FILE3")) filenum = 2;
+  if(!strcmp((const char *)iobuf, "FILE4")) filenum = 3;
+  if(filenum == -1) {
+    // Test only. Handle only 4 files
+    return;
+  }
+  recv_file(filenum, (char *)iobuf);
+
+  Serial.println("Files in storage:");
+  for(int i=0;i<4;i++) {
+    Serial.print("  ");
+    Serial.print(i+1);
+    Serial.print(": ");
+    Serial.print((const char *)&filename[i*16]);
+    Serial.print("  (");
+    Serial.print(filesize[i]);
+    Serial.println(" bytes)");
   }
 }
 
@@ -457,7 +521,7 @@ void handle_atn() {
     sec_addr = sec & IEC_ADDRESS;
     if(mode == IEC_LISTEN) {
       wait_atn(HIGH);
-      // handle_listen();
+      handle_listen(sec_addr);
     } else if(mode == IEC_TALK) {
       release_clock();
       release_data();
