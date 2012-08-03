@@ -1,10 +1,13 @@
+#include <EtherCard.h>
+#include "tftp.h"
+
 #define SRQIN 2
 #define ATN 3
 #define CLOCK 4
 #define DATA 5
-#define AVR_EOI 10
-#define AVR_DEBUG 12
-#define AVR_TIMEOUT 11
+#define AVR_EOI A0
+#define AVR_DEBUG A1
+#define AVR_TIMEOUT A2
 
 #define IEC_COMMAND  0xf0
 #define IEC_DEVICE   0x0f
@@ -25,55 +28,15 @@
 typedef unsigned char uchar;
 
 int iec_mode = 0;
-uchar iobuf[255];
+uchar iobuf[TFTP_BLKSIZE];
 
-uchar storage[512];
-int filesize[4];
-uchar filename[4*16];
-uchar testfile[34] = { 
-  0x01, 0x08, 0x16, 0x08, 0x0a, 0x00, 0x99, 0x20, 
-  0x22, 0x48, 0x45, 0x4c, 0x4c, 0x4f, 0x20, 0x57, 
-  0x4f, 0x52, 0x4c, 0x44, 0x21, 0x22, 0x00, 0x1f, 
-  0x08, 0x14, 0x00, 0x89, 0x20, 0x31, 0x30, 0x00, 
-  0x00, 0x00 };
+// ethernet interface mac address
+static byte mymac[] = { 0x42,0x42,0x42,0x01,0x02,0x03 };
 
-// #define DEBUG 1
+byte Ethernet::buffer[700];
+static long timer;
+static int dhcp_active = 0;
 
-static inline void print_str(char *str) {
-#if DEBUG
-  Serial.print(str);
-#endif
-}
-
-static inline void println_str(char *str) {
-#if DEBUG
-  Serial.println(str);
-#endif
-}
-
-static inline void print_dec(int dec) {
-#if DEBUG
-  Serial.print(dec);
-#endif
-}
-
-static inline void println_dec(int dec) {
-#if DEBUG
-  Serial.println(dec);
-#endif
-}
-
-static inline void print_hex(int hex) {
-#if DEBUG
-  Serial.print(hex, HEX);
-#endif
-}
-
-static inline void println_hex(int hex) {
-#if DEBUG
-  Serial.println(hex, HEX);
-#endif
-}
 
 static inline void clear_iobuf() {
   for(int i=0;i<sizeof(iobuf);i++) {
@@ -295,38 +258,21 @@ int put_byte(uchar value, int eoi) {
 }
 
 void handle_close(uchar sec_addr) {
-  print_str("CLOSE: ");
-  println_hex(sec_addr);
 }
 
 void handle_open(uchar sec_addr) {
   int a = 0;
   int eoi;
-  print_str("OPEN: ");
-  println_hex(sec_addr);
 
   do {
     if(atn_active()) return;
     eoi = get_byte(&iobuf[a], 0);
-    //    Serial.print("EOI: ");
-    //    Serial.println(eoi);
     a++;
-    //    Serial.print("Count: ");
-    //    Serial.println(a);
   } while(!eoi && a < sizeof(iobuf)-1);
   iobuf[a] = '\0';
-  print_str("OPEN: Data == ");
-  println_str((char *)iobuf);
-  if(eoi) {
-    println_str("OPEN: EOI triggered");
-  }
-  print_str("OPEN: Bytes received: ");
-  println_dec(a);
-  //  for(int i=0;i<a;i++) {
-  //    Serial.println(iobuf[i], HEX);
-  //  }
 }
 
+#if 0
 #define TITLE "TESTDIR"
 #define C64TYPE " PRG "
 #define BLKFREE "BLOCKS FREE."
@@ -392,36 +338,21 @@ void send_dir() {
   put_byte(0, 0);
   put_byte(0, 1);
 }
-
-
-void clear_filedata() {
-  for(int i=0;i<sizeof(filename);i++) {
-    filename[i] = '\0';
-  }
-  for(int i=0;i<4;i++) {
-    filesize[i] = 0;
-  }
-}
-
-void send_testfile() {
-  int eoi;
-  for(int i=0;i<sizeof(testfile);i++) {
-    eoi = 0;
-    if(i == (sizeof(testfile)-1)) eoi = 1;
-    put_byte(testfile[i], eoi);
-  }
-}
+#endif
 
 void send_file(int filenum) {
+#if 0
   int eoi;
   for(int i=0;i<filesize[filenum];i++) {
     eoi = 0;
     if(i == (filesize[filenum]-1)) eoi = 1;
     put_byte(storage[i+128*filenum], eoi);
   }
+#endif
 }
 
 void recv_file(int filenum, const char *name) {
+#if 0
   int a;
   int eoi = 0;
 
@@ -439,6 +370,7 @@ void recv_file(int filenum, const char *name) {
   }
 
   filesize[filenum] = a;
+#endif
 }
 
 void handle_listen(uchar sec_addr) {
@@ -450,29 +382,11 @@ void handle_listen(uchar sec_addr) {
   }
 
   filenum = -1;
-  if(!strcmp((const char *)iobuf, "FILE1")) filenum = 0;
-  if(!strcmp((const char *)iobuf, "FILE2")) filenum = 1;
-  if(!strcmp((const char *)iobuf, "FILE3")) filenum = 2;
-  if(!strcmp((const char *)iobuf, "FILE4")) filenum = 3;
-  if(filenum == -1) {
-    // Test only. Handle only 4 files
-    return;
-  }
   recv_file(filenum, (char *)iobuf);
-
-  Serial.println("Files in storage:");
-  for(int i=0;i<4;i++) {
-    Serial.print("  ");
-    Serial.print(i+1);
-    Serial.print(": ");
-    Serial.print((const char *)&filename[i*16]);
-    Serial.print("  (");
-    Serial.print(filesize[i]);
-    Serial.println(" bytes)");
-  }
 }
 
 void handle_talk(uchar sec_addr) {
+#if 0
   if(strlen((const char *)iobuf) == 1 && iobuf[0] == '$') {
     send_dir();
   } else if(strlen((const char *)iobuf) == 8 && !strcmp((const char *)iobuf, "TESTFILE")) {
@@ -486,6 +400,7 @@ void handle_talk(uchar sec_addr) {
   } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE4")) {
     send_file(3);
   }
+#endif
 }
 
 void handle_atn() {
@@ -522,12 +437,6 @@ void handle_atn() {
 
   delayMicroseconds(200);
   if(!get_byte(&sec, 1)) return;
-  print_str("Device: ");
-  println_hex(device);
-  print_str("Mode: ");
-  println_hex(mode);
-  print_str("Secondary: ");
-  println_hex(sec);
 
   sec_mode = sec & IEC_MODE;
   if(sec_mode == IEC_OPEN) {
@@ -570,7 +479,6 @@ void setup() {
   pinMode(AVR_TIMEOUT, OUTPUT);
 
   clear_iobuf();
-  clear_filedata();
 
   //  digitalWrite(AVR_DEBUG, HIGH);
   pull_clock();
@@ -581,9 +489,34 @@ void setup() {
   //  digitalWrite(AVR_TIMEOUT, LOW);
   
   Serial.begin(9600);
+
+  Serial.println("Initializing Ethernet...");
+  if (ether.begin(sizeof Ethernet::buffer, mymac) == 0) {
+    Serial.println( "Failed to access Ethernet controller");
+  }
+  Serial.println("Ethernet connected...");
+  Serial.println("Sending DHCP Request...");
+  if (!ether.dhcpSetup()) {
+    Serial.println("DHCP failed");
+  } else {
+    dhcp_active = 1;
+    Serial.println("DHCP Request received...");
+    Serial.println("Fetching Server MAC...");
+    ether.sendArpRequest(ether.serverip);
+    while(!ether.serverMacKnown())
+      ether.packetLoop(ether.packetReceive());
+    Serial.println("Server MAC received...");
+  }
 }
 
 void loop() {
+  int plen;
+  plen = ether.packetReceive();
+  ether.packetLoop(plen);
+
+  /* Check if this packet is interesting, return if not, or if plen == 0 */
+  tftp_recv_packet(plen);
+
   if(atn_active()) {
     release_clock();
     pull_data();
