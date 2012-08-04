@@ -17,6 +17,7 @@
 
 extern byte tftpdata[];
 extern volatile int tftp_request_in_progress;
+extern volatile int tftp_error;
 
 extern int tftp_get_file(char *filename);
 extern int tftp_put_file(char *filename);

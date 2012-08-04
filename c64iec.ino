@@ -22,7 +22,8 @@
 #define IEC_FASTLOAD 0xd0
 #define IEC_DATA     0x60
 
-#define TIMEOUT_COUNT 2500
+//#define TIMEOUT_COUNT 2500
+#define TIMEOUT_COUNT 2700
 #define DEVNO 8
 
 #define C64_FILE_LIMIT 15
@@ -325,7 +326,7 @@ void handle_open(uchar sec_addr) {
   iobuf[a] = '\0';
 }
 
-void send_file() {
+int send_file() {
   int eoi = 0;
   int at_start = 1;
   int iobuf_offset = 0;
@@ -339,6 +340,7 @@ void send_file() {
     /* Fetch TFTP block repeatedly until we get data or last block. */
     while(unsent_data == 0 && tftp_request_in_progress == TFTP_GET) {
       ethernet_probe_for_packet();
+      if(tftp_error) return 0;
       unsent_data = tftp_get_block(iobuf+iobuf_offset, (at_start ? 26 : 0));
       if(unsent_data) {
 	sent_this_time = 0;
@@ -387,6 +389,7 @@ void send_file() {
   }
   
   //  Serial.print("Sent total: "); Serial.println(sent_to_c64);
+  return 1;
 }
 
 void recv_file(int filenum, const char *name) {
@@ -442,7 +445,11 @@ void handle_talk(uchar sec_addr) {
     create_tftp_filename(iobuf);
   }
 
-  send_file();
+  if(!send_file()) {
+    /* Should hopefully signal error */
+    release_clock();
+    release_data();
+  }
 #if 0
   if(strlen((const char *)iobuf) == 1 && iobuf[0] == '$') {
     send_dir();

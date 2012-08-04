@@ -6,6 +6,7 @@ volatile int tftp_request_in_progress = 0;
 volatile int tftp_filesize = 0;
 volatile int tftp_wrq_datasize = 0;
 volatile int tftp_wrq_lastblock = 0;
+volatile int tftp_error = 0;
 uint16_t tftp_srvport = 0;
 uint16_t tftp_blknum = 0;
 uint16_t tftp_lastblk = 0;
@@ -134,6 +135,7 @@ int tftp_recv_packet(int plen) {
       if(TFTP_TYPE == TFTP_OPTACK) tftp_blknum = 0;
       tftp_clear_to_send = 1;
     } else if(TFTP_TYPE == TFTP_ERROR) {
+      tftp_error = 1;
       tftp_request_in_progress = TFTP_NORQ;
     }
   }
@@ -143,6 +145,7 @@ int tftp_get_file(char *filename) {
   tftp_data_available = 0;
   tftp_end_of_data = 0;
   tftp_lastgot = 0;
+  tftp_error = 0;
   return tftp_send_rrq(filename);
 }
 
