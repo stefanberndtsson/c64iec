@@ -26,7 +26,8 @@
 #define TIMEOUT_COUNT 2700
 #define DEVNO 8
 
-#define C64_FILE_LIMIT 15
+#define C64_FILE_LIMIT 16
+#define PC64_SIZE 26
 
 typedef unsigned char uchar;
 
@@ -54,10 +55,13 @@ void create_tftp_filename(uchar *c64name) {
   int out_pos = C64_FILE_LIMIT*3+4;
   int out_size = out_pos;
   int start_pos = C64_FILE_LIMIT;
+  int trailing = 1;
   if(strlen((const char *)c64name) < start_pos) start_pos = strlen((const char *)c64name);
   int i;
   for(i=start_pos-1;i>=0;--i) {
     if(c64name[i] == 0xa0 || c64name[i] == 0x00) continue;
+    if(c64name[i] == ' ' && trailing) continue;
+    trailing = 0;
     if((c64name[i] >= '0' && c64name[i] <= '9') ||
        (c64name[i] >= 'A' && c64name[i] <= 'Z') ||
        (c64name[i] == ' ' || c64name[i] == '-' || 
@@ -77,6 +81,21 @@ void create_tftp_filename(uchar *c64name) {
   tftp_filename[out_size-out_pos+3] = '0';
   tftp_filename[out_size-out_pos+4] = '\0';
   Serial.println(tftp_filename);
+}
+
+void pc64_make_header(byte *iobuf) {
+  int len;
+  len = strlen((const char *)iobuf);
+  if(len <= C64_FILE_LIMIT) {
+    for(int i=0;i<(C64_FILE_LIMIT-len);i++) {
+      iobuf[len+i] = '\0';
+    }
+  }
+
+  memmove(iobuf+8, iobuf, C64_FILE_LIMIT);
+  strcpy((char *)iobuf, "C64File");
+  iobuf[24] = '\0';
+  iobuf[25] = '\0'; /* REL Record size */
 }
 
 void ethernet_probe_for_packet() {
@@ -341,7 +360,7 @@ int send_file() {
     while(unsent_data == 0 && tftp_request_in_progress == TFTP_GET) {
       ethernet_probe_for_packet();
       if(tftp_error) return 0;
-      unsent_data = tftp_get_block(iobuf+iobuf_offset, (at_start ? 26 : 0));
+      unsent_data = tftp_get_block(iobuf+iobuf_offset, (at_start ? PC64_SIZE : 0));
       if(unsent_data) {
 	sent_this_time = 0;
 	//	Serial.print("Got from TFTP: "); Serial.println(unsent_data);
@@ -380,7 +399,7 @@ int send_file() {
       sent_this_time++;
     }
     if(!eoi) {
-      iobuf[0] = iobuf[TFTP_BLKSIZE-26*at_start-1+iobuf_offset];
+      iobuf[0] = iobuf[TFTP_BLKSIZE-PC64_SIZE*at_start-1+iobuf_offset];
       iobuf_offset = 1;
       at_start = 0;
     }
@@ -392,42 +411,63 @@ int send_file() {
   return 1;
 }
 
-void recv_file(int filenum, const char *name) {
-#if 0
+int recv_file() {
   int a;
   int eoi = 0;
 
-  strcpy((char *)&filename[filenum*16], name);
+  tftp_put_file(tftp_filename);
+  //  Serial.println("SAVE: Creating PC64 header...");
+  pc64_make_header(iobuf);
+  //  Serial.println("SAVE: PC64 header done...");
 
-  a = 0;
+  a=26;
   do {
-    if(atn_active()) return;
-    eoi = get_byte(&storage[a+filenum*128], 0);
+    if(atn_active()) {
+      //      Serial.println("ERROR! ATN is active...");
+      return 0;
+    }
+    ethernet_probe_for_packet();
+    eoi = get_byte(&iobuf[a], 0);
     a++;
-  } while (!eoi && a < sizeof(storage)/4-1);
+    if(tftp_request_in_progress != TFTP_PUT || tftp_error) return 0;
+    if(a == 256 || eoi) {
+      Serial.println("SAVE: Time to send to TFTP");
+      while(!tftp_put_block(iobuf, a))
+	ethernet_probe_for_packet();
 
-  if(a >= sizeof(storage)/4-1) {
-    Serial.println("DEBUG: SAVE Exceeded storage...");
-  }
+      if(a == 256 && eoi) {
+	// We need to send an extra empty packet here to signal end of transmission
+	while(!tftp_put_block(iobuf, 0))
+	  ethernet_probe_for_packet();
+      }
+      a = 0;
+    }
+  } while(!eoi);
+  Serial.println("SAVE: All done.");
 
-  filesize[filenum] = a;
-#endif
+  return 1;
 }
 
 void handle_listen(uchar sec_addr) {
-  int filenum;
-
   Serial.print("Mode/Device: ");
   Serial.println(device_mode, HEX);
   Serial.print("Secondary: ");
   Serial.println(secondary, HEX);
+  Serial.print("Filename: ");
+  Serial.println((char *)iobuf);
   if(sec_addr != 1) {
+    Serial.println("TODO: SAVE only for now!");
     // Only supporting SAVE
     return;
   }
 
-  filenum = -1;
-  recv_file(filenum, (char *)iobuf);
+  create_tftp_filename(iobuf);
+
+  if(!recv_file()) {
+    Serial.println("SAVE: Something went wrong...");
+    release_clock();
+    release_data();
+  }
 }
 
 void handle_talk(uchar sec_addr) {
@@ -450,21 +490,6 @@ void handle_talk(uchar sec_addr) {
     release_clock();
     release_data();
   }
-#if 0
-  if(strlen((const char *)iobuf) == 1 && iobuf[0] == '$') {
-    send_dir();
-  } else if(strlen((const char *)iobuf) == 8 && !strcmp((const char *)iobuf, "TESTFILE")) {
-    send_testfile();
-  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE1")) {
-    send_file(0);
-  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE2")) {
-    send_file(1);
-  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE3")) {
-    send_file(2);
-  } else if(strlen((const char *)iobuf) == 5 && !strcmp((const char *)iobuf, "FILE4")) {
-    send_file(3);
-  }
-#endif
 }
 
 void handle_atn() {
@@ -488,6 +513,8 @@ void handle_atn() {
       release_clock();
       release_data();
       Serial.println("LISTEN: Not our device");
+      Serial.print("Mode/Device: ");
+      Serial.println(device_mode, HEX);
       return;
     }
   } else if(mode == IEC_TALK) {

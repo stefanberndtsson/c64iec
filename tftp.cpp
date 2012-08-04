@@ -167,6 +167,7 @@ int tftp_get_block(byte *receive_buffer, byte offset) {
 
 int tftp_put_file(char *filename) {
   tftp_clear_to_send = 0;
+  tftp_error = 0;
   return tftp_send_wrq(filename);
 }
 
@@ -183,5 +184,6 @@ int tftp_put_block(byte *send_buffer, uint16_t size) {
   if(size == 0 || size != TFTP_BLKSIZE) {
     tftp_request_in_progress = TFTP_NORQ;
   }
+  return 1;
 }
 
