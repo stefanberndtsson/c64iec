@@ -36,6 +36,11 @@ from the Arduino side, so a full PC64-implementation is tricky. Directory listin
 is possible by running the "create_listdir" (source in the tools-directory) while in the TFTP
 directory and redirecting the output to a file called "list.dir".
 
+IP is set using DHCP. No renew is sent, so the lease-time needs to be "long enough". The IP
+of the TFTP-server is set using the "next-server" option in the DHCP reply. MAC address is
+set to 42:42:42:01:02:03 by default (in an array in c64iec.ino). TFTP-server needs to be on
+the same network as the client.
+
 
 Makefile
 --------
