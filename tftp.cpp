@@ -2,13 +2,15 @@
 #include "EtherCard.h"
 #include "tftp.h"
 
-byte tftpdata[TFTP_BLKSIZE+4];
 volatile int tftp_request_in_progress = 0;
 volatile int tftp_filesize = 0;
 volatile int tftp_wrq_datasize = 0;
 volatile int tftp_wrq_lastblock = 0;
-uint16_t tftp_blknum = 0;
 uint16_t tftp_srvport = 0;
+uint16_t tftp_blknum = 0;
+uint16_t tftp_lastblk = 0;
+uint16_t tftp_lastgot = 0;
+byte tftpdata[TFTP_BLKSIZE+4];
 
 volatile int tftp_data_available = 0;
 volatile int tftp_clear_to_send = 0;
@@ -115,11 +117,13 @@ int tftp_recv_packet(int plen) {
   if(plen <= 0) return 0;
   if(!ether.is_myIp(plen)) return 0;
 
-  /* Have to extract these immediately, or the next packet we receive will overwrite the data */
-  tftp_blknum = TFTP_BLKNUM;
-  tftp_srvport = TFTP_SRVPORT;
-
   if(ether.buffer[IP_PROTO_P] == IP_PROTO_UDP_V && TFTP_DSTPORT == SRCPORT) {
+    /* Have to extract these immediately, or the next packet we receive will overwrite the data */
+    tftp_blknum = TFTP_BLKNUM;
+    tftp_srvport = TFTP_SRVPORT;
+    if(tftp_lastblk == tftp_blknum) return 0;
+    //    Serial.print("Last block: "); Serial.print(tftp_lastblk); Serial.print("   Current block: "); Serial.println(tftp_blknum);
+    tftp_lastblk = tftp_blknum;
     if(TFTP_TYPE == TFTP_OPTACK && tftp_request_in_progress != TFTP_WRQ) {
       tftp_send_ack(TFTP_SRVPORT, 0); /* Simply ACK this with blknum 0. No data to receive yet. */
     } else if(TFTP_TYPE == TFTP_DATA && tftp_request_in_progress == TFTP_RRQ) {
@@ -129,6 +133,8 @@ int tftp_recv_packet(int plen) {
     } else if((TFTP_TYPE == TFTP_ACK || TFTP_TYPE == TFTP_OPTACK) && tftp_request_in_progress == TFTP_WRQ) {
       if(TFTP_TYPE == TFTP_OPTACK) tftp_blknum = 0;
       tftp_clear_to_send = 1;
+    } else if(TFTP_TYPE == TFTP_ERROR) {
+      tftp_request_in_progress = TFTP_NORQ;
     }
   }
 }
@@ -136,21 +142,24 @@ int tftp_recv_packet(int plen) {
 int tftp_get_file(char *filename) {
   tftp_data_available = 0;
   tftp_end_of_data = 0;
+  tftp_lastgot = 0;
   return tftp_send_rrq(filename);
 }
 
 int tftp_get_block(byte *receive_buffer, byte offset) {
   if(!tftp_data_available && !tftp_end_of_data) return 0;
+  if(tftp_lastgot && tftp_lastgot >= tftp_blknum) return 0;
   if(tftp_data_available) {
     // We have data to copy. This may be 0 if total size was multiple of blksize
     // in which case we skip copying and just ACK
     memcpy(receive_buffer, tftpdata+offset, tftp_data_available-offset);
   }
+  tftp_lastgot = tftp_blknum;
   tftp_send_ack(tftp_srvport, tftp_blknum);
   if(tftp_end_of_data) {
     tftp_request_in_progress = TFTP_NORQ;
   }
-  return tftp_data_available;
+  return tftp_data_available-offset;
 }
 
 int tftp_put_file(char *filename) {
