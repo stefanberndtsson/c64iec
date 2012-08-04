@@ -22,7 +22,6 @@
 #define IEC_FASTLOAD 0xd0
 #define IEC_DATA     0x60
 
-//#define TIMEOUT_COUNT 2500
 #define TIMEOUT_COUNT 2700
 #define DEVNO 8
 
@@ -80,7 +79,6 @@ void create_tftp_filename(uchar *c64name) {
   tftp_filename[out_size-out_pos+2] = '0';
   tftp_filename[out_size-out_pos+3] = '0';
   tftp_filename[out_size-out_pos+4] = '\0';
-  Serial.println(tftp_filename);
 }
 
 void pc64_make_header(byte *iobuf) {
@@ -271,16 +269,12 @@ int get_byte(uchar *output, int force_eoi) {
   if(!wait_clock(LOW)) return 0;
   
   pull_data();
-  //  *output = ~(*output);
-  //  Serial.println(*output);
 
   if(eoi) {
     release_clock();
     pull_data();
   }
   delayMicroseconds(100);
-  //  Serial.print("Time: ");
-  //  Serial.println(time_second-time_first);
 
   return eoi;
 }
@@ -327,10 +321,7 @@ int put_byte(uchar value, int eoi) {
 }
 
 void handle_close(uchar sec_addr) {
-  Serial.print("Mode/Device: ");
-  Serial.println(device_mode, HEX);
-  Serial.print("Secondary: ");
-  Serial.println(secondary, HEX);
+  // Nothing really to do here...
 }
 
 void handle_open(uchar sec_addr) {
@@ -363,19 +354,14 @@ int send_file() {
       unsent_data = tftp_get_block(iobuf+iobuf_offset, (at_start ? PC64_SIZE : 0));
       if(unsent_data) {
 	sent_this_time = 0;
-	//	Serial.print("Got from TFTP: "); Serial.println(unsent_data);
       }
       if(tftp_request_in_progress != TFTP_GET) {
-	//	Serial.println("Got EOI");
 	eoi = 1;
 	break;
       }
     }
     if(unsent_data) {
       for(int i=0;i<unsent_data-1+iobuf_offset;i++) {
-	//	if((sent_to_c64 > 225 && sent_to_c64 < 235)) {
-	//	  Serial.print(iobuf[i], HEX); Serial.print(" ");
-	//	}
 	put_byte(iobuf[i], 0);
 	sent_to_c64++;
 	sent_this_time++;
@@ -394,7 +380,6 @@ int send_file() {
       unsent_data = 0;
     } else if(eoi) {
       put_byte(iobuf[0], 1);
-      //      Serial.println("Sent last byte...");
       sent_to_c64++;
       sent_this_time++;
     }
@@ -403,11 +388,8 @@ int send_file() {
       iobuf_offset = 1;
       at_start = 0;
     }
-    //    Serial.print("Sent to C64: "); Serial.println(sent_to_c64);
-    //    Serial.print("Sent this time: "); Serial.println(sent_this_time);
   }
   
-  //  Serial.print("Sent total: "); Serial.println(sent_to_c64);
   return 1;
 }
 
@@ -416,34 +398,26 @@ int recv_file() {
   int eoi = 0;
 
   tftp_put_file(tftp_filename);
-  //  Serial.println("SAVE: Creating PC64 header...");
   pc64_make_header(iobuf);
-  //  Serial.println("SAVE: PC64 header done...");
 
   a=26;
   do {
-    if(atn_active()) {
-      //      Serial.println("ERROR! ATN is active...");
-      return 0;
-    }
+    if(atn_active()) return 0;
     ethernet_probe_for_packet();
     eoi = get_byte(&iobuf[a], 0);
     a++;
     if(tftp_request_in_progress != TFTP_PUT || tftp_error) return 0;
     if(a == 256 || eoi) {
-      Serial.println("SAVE: Time to send to TFTP");
       while(!tftp_put_block(iobuf, a))
 	ethernet_probe_for_packet();
 
       if(a == 256 && eoi) {
-	// We need to send an extra empty packet here to signal end of transmission
 	while(!tftp_put_block(iobuf, 0))
 	  ethernet_probe_for_packet();
       }
       a = 0;
     }
   } while(!eoi);
-  Serial.println("SAVE: All done.");
 
   return 1;
 }
@@ -464,7 +438,6 @@ void handle_listen(uchar sec_addr) {
   create_tftp_filename(iobuf);
 
   if(!recv_file()) {
-    Serial.println("SAVE: Something went wrong...");
     release_clock();
     release_data();
   }
@@ -573,13 +546,10 @@ void setup() {
 
   clear_iobuf();
 
-  //  digitalWrite(AVR_DEBUG, HIGH);
   pull_clock();
   digitalWrite(CLOCK, HIGH);
   release_clock();
   pull_data();
-  //  digitalWrite(AVR_DEBUG, LOW);
-  //  digitalWrite(AVR_TIMEOUT, LOW);
   
   Serial.begin(9600);
 

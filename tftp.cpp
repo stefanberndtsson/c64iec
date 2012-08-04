@@ -106,10 +106,6 @@ int tftp_send_data(uint16_t srvport, int blknum) {
   tftpdata[2] = blknum>>8;
   tftpdata[3] = blknum;
   tftp_filesize += tftp_wrq_datasize;
-  Serial.print("Sending packet ");
-  Serial.print(blknum);
-  Serial.print(": ");
-  Serial.println(tftp_wrq_datasize);
   ether.sendUdp((char *)tftpdata, tftp_wrq_datasize+4, SRCPORT, ether.serverip, srvport);
 }
 
@@ -123,7 +119,6 @@ int tftp_recv_packet(int plen) {
     tftp_blknum = TFTP_BLKNUM;
     tftp_srvport = TFTP_SRVPORT;
     if(tftp_lastblk == tftp_blknum) return 0;
-    //    Serial.print("Last block: "); Serial.print(tftp_lastblk); Serial.print("   Current block: "); Serial.println(tftp_blknum);
     tftp_lastblk = tftp_blknum;
     if(TFTP_TYPE == TFTP_OPTACK && tftp_request_in_progress != TFTP_WRQ) {
       tftp_send_ack(TFTP_SRVPORT, 0); /* Simply ACK this with blknum 0. No data to receive yet. */
