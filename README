@@ -31,10 +31,8 @@ Ethernet connected on SPI, with D8 as CS.
 Ethernet Server
 ---------------
 
-Server side uses "atftpd" and PC64-files (sort of). There is no way to list available files
-from the Arduino side, so a full PC64-implementation is tricky. Directory listing (LOAD"$",8)
-is possible by running the "create_listdir" (source in the tools-directory) while in the TFTP
-directory and redirecting the output to a file called "list.dir".
+Server (available in the tools directory) is a ruby hack, c64iecd, which is basically a tweaked
+version of a TFTP-server. It runs on port 53280.
 
 IP is set using DHCP. No renew is sent, so the lease-time needs to be "long enough". The IP
 of the TFTP-server is set using the "next-server" option in the DHCP reply. MAC address is
