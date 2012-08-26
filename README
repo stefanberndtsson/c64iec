@@ -21,9 +21,9 @@ Connection to C64 using DIN6 Serial IEC connector
 The IEC is connected as follows:
 
 GND (DIN6 pin 2) to Arduino GND
-ATN (DIN6 pin 3) to Arduino D3
-CLOCK (DIN6 pin 4) to Arduino D4
-DATA (DIN6 pin 5) to Arduino D5
+ATN (DIN6 pin 3) to Arduino D2
+CLOCK (DIN6 pin 4) to Arduino D3
+DATA (DIN6 pin 5) to Arduino D4
 
 Ethernet connected on SPI, with D8 as CS.
 

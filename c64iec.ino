@@ -1,10 +1,10 @@
 #include <EtherCard.h>
 #include "tftp.h"
 
-#define SRQIN 2
-#define ATN 3
-#define CLOCK 4
-#define DATA 5
+/* #define SRQIN 2 */
+#define ATN 2
+#define CLOCK 3
+#define DATA 4
 #define AVR_EOI A0
 #define AVR_DEBUG A1
 #define AVR_TIMEOUT A2
@@ -26,7 +26,7 @@
 #define DEVNO 8
 
 #define C64_FILE_LIMIT 16
-#define PC64_SIZE 26
+#define PC64_SIZE 0
 
 typedef unsigned char uchar;
 
@@ -65,7 +65,7 @@ void create_tftp_filename(uchar *c64name) {
        (c64name[i] >= 'A' && c64name[i] <= 'Z') ||
        (c64name[i] == ' ' || c64name[i] == '-' || 
         c64name[i] == '_' || c64name[i] == '.')) {
-      tftp_filename[--out_pos] = tolower(c64name[i]);
+      tftp_filename[--out_pos] = c64name[i];// tolower(c64name[i]);
     } else {
       out_pos -= 3;
       tftp_filename[out_pos] = '%';
@@ -74,11 +74,11 @@ void create_tftp_filename(uchar *c64name) {
     }
   }
   memmove(tftp_filename, &tftp_filename[out_pos], out_size-out_pos);
-  tftp_filename[out_size-out_pos] = '.';
-  tftp_filename[out_size-out_pos+1] = 'p';
-  tftp_filename[out_size-out_pos+2] = '0';
-  tftp_filename[out_size-out_pos+3] = '0';
-  tftp_filename[out_size-out_pos+4] = '\0';
+  tftp_filename[out_size-out_pos] = '\0';
+  //  tftp_filename[out_size-out_pos+1] = 'p';
+  //  tftp_filename[out_size-out_pos+2] = '0';
+  //  tftp_filename[out_size-out_pos+3] = '0';
+  //  tftp_filename[out_size-out_pos+4] = '\0';
 }
 
 void pc64_make_header(byte *iobuf) {
@@ -398,9 +398,9 @@ int recv_file() {
   int eoi = 0;
 
   tftp_put_file(tftp_filename);
-  pc64_make_header(iobuf);
+  //  pc64_make_header(iobuf);
 
-  a=26;
+  a=0;
   do {
     if(atn_active()) return 0;
     ethernet_probe_for_packet();
@@ -452,11 +452,7 @@ void handle_talk(uchar sec_addr) {
   Serial.println(secondary, HEX);
   Serial.print("Filename: ");
   Serial.println((char *)iobuf);
-  if(strlen((const char *)iobuf) == 1 && iobuf[0] == '$') {
-    strcpy(tftp_filename, "list.dir");
-  } else {
-    create_tftp_filename(iobuf);
-  }
+  create_tftp_filename(iobuf);
 
   if(!send_file()) {
     /* Should hopefully signal error */
@@ -536,7 +532,7 @@ void handle_atn() {
 }
 
 void setup() {
-  pinMode(SRQIN, OUTPUT);
+  /*  pinMode(SRQIN, OUTPUT); */
   pinMode(ATN, INPUT);
   pinMode(CLOCK, INPUT);
   pinMode(DATA, INPUT);

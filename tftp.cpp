@@ -9,7 +9,7 @@ volatile int tftp_wrq_lastblock = 0;
 volatile int tftp_error = 0;
 uint16_t tftp_srvport = 0;
 uint16_t tftp_blknum = 0;
-uint16_t tftp_lastblk = 0;
+uint16_t tftp_lastblk = -1;
 uint16_t tftp_lastgot = 0;
 byte tftpdata[TFTP_BLKSIZE+4];
 
@@ -22,6 +22,7 @@ volatile int tftp_end_of_data = 0;
 #define TFTP_DATASIZE ((uint16_t)((ether.buffer[UDP_LEN_H_P]<<8|ether.buffer[UDP_LEN_L_P])-12))
 #define TFTP_SRVPORT ((uint16_t)(ether.buffer[UDP_SRC_PORT_H_P]<<8|ether.buffer[UDP_SRC_PORT_L_P]))
 #define TFTP_DSTPORT ((uint16_t)(ether.buffer[UDP_DST_PORT_H_P]<<8|ether.buffer[UDP_DST_PORT_L_P]))
+#define TFTP_PORT 53280
 
 int tftp_build_request(char *filename, uint16_t mode) {
   int size = 0;
@@ -60,7 +61,7 @@ int tftp_send_rrq(char *filename) {
     return 0;
   }
   
-  ether.sendUdp((char *)tftpdata, rrq_size, SRCPORT, ether.serverip, 69);
+  ether.sendUdp((char *)tftpdata, rrq_size, SRCPORT, ether.serverip, TFTP_PORT);
   tftp_request_in_progress = TFTP_RRQ;
   tftp_filesize = 0;
   return rrq_size;
@@ -75,7 +76,7 @@ int tftp_send_wrq(char *filename) {
     return 0;
   }
   
-  ether.sendUdp((char *)tftpdata, wrq_size, SRCPORT, ether.serverip, 69);
+  ether.sendUdp((char *)tftpdata, wrq_size, SRCPORT, ether.serverip, TFTP_PORT);
   tftp_request_in_progress = TFTP_WRQ;
   tftp_filesize = 0;
   return wrq_size;
@@ -141,6 +142,7 @@ int tftp_get_file(char *filename) {
   tftp_end_of_data = 0;
   tftp_lastgot = 0;
   tftp_error = 0;
+  tftp_lastblk = -1;
   return tftp_send_rrq(filename);
 }
 
@@ -163,6 +165,7 @@ int tftp_get_block(byte *receive_buffer, byte offset) {
 int tftp_put_file(char *filename) {
   tftp_clear_to_send = 0;
   tftp_error = 0;
+  tftp_lastblk = -1;
   return tftp_send_wrq(filename);
 }
 
