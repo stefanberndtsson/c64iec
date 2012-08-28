@@ -216,9 +216,11 @@ class DeviceDir < Device
   end
 
   def rewrite_filename(filename)
-    reduced = filename.gsub(/[\xa0 ]*$/,"")
+    reduced = filename.gsub(/[\x00\xa0 ]*$/,"")
     STDERR.puts("DEBUG: reduced: #{reduced.inspect}")
-    [reduced," "*(filename.size-reduced.size)]
+    tmp = [reduced," "*(C64File::PC64_FILENAME_SIZE-reduced.size)]
+    STDERR.puts("DEBUG: returned: #{tmp.inspect}")
+    tmp
   end
 
   def dir_footer

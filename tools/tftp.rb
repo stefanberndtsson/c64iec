@@ -64,12 +64,15 @@ class TFTP
   def packet_rrq(data)
     @filename = data.cstring(FILEPOS)
     offset = @filename.size
-    if(@filename[/^(\d+)\/(.*)/])
-      @device_num = $1.to_i
+    if(@filename[/^([89abcdef])\/(.*)/])
+      @device_num = "89abcdef".index($1)+8
       @filename = $2
     else
       @device_num = 8
     end
+
+    STDERR.puts("DEBUG: Device: #{@device_num}")
+    STDERR.puts("DEBUG: File: #{@filename}")
 
     tftp_options(data, FILEPOS+offset+1)
 
@@ -90,12 +93,15 @@ class TFTP
   def packet_wrq(data)
     @filename = data.cstring(FILEPOS)
     offset = @filename.size
-    if(@filename[/^(\d+)\/(.*)/])
-      @device_num = $1.to_i
+    if(@filename[/^([89abcdef])\/(.*)/])
+      @device_num = "89abcdef".index($1)+8
       @filename = $2
     else
       @device_num = 8
     end
+
+    STDERR.puts("DEBUG: Device: #{@device_num}")
+    STDERR.puts("DEBUG: File: #{@filename}")
 
     tftp_options(data, FILEPOS+offset+1)
 
@@ -260,6 +266,11 @@ class TFTP
         {
           :id => 9,
           :path => "/var/tmp/c64iecd/9",
+          :type => :dir
+        },
+        {
+          :id => 10,
+          :path => "/var/tmp/c64iecd/a",
           :type => :dir
         }
       ]
