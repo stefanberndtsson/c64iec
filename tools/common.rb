@@ -5,6 +5,10 @@ class Array
 end
 
 class String
+  def uint8(offset = 0)
+    self[offset].unpack("C").first
+  end
+
   def uint16(offset = 0)
     self[offset..offset+1].unpack("n").first
   end

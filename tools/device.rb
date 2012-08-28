@@ -108,6 +108,7 @@ class Device
 
   def self.create(id, path, type)
     return DeviceDir.new(id, path, type, false) if type == :dir
+    return DeviceD64.new(id, path, type, true) if type == :d64
   end
 end
 
@@ -227,5 +228,66 @@ class DeviceDir < Device
     footer = [@addr].pack("v")
     footer += "\xff\xffBLOCKS FREE.\x00\x00\x00"
     footer
+  end
+end
+
+class DeviceD64 < Device
+  BLKSIZE=256
+  SECTORS=[21]*17 + [19]*7 + [18]*6 + [17]*10
+  FILE_TYPE_PRG=2
+
+  def open(filename, mode = :read)
+    read_disk
+  end
+
+  def read(bytes)
+  end
+
+  def close
+  end
+
+  def directory
+    entries = collect_directory_entries(18, 1)
+  end
+
+  def collect_directory_entries(track, sector)
+    entries = []
+    blk = read_block(track, sector)
+    next_track = blk.uint8(0)
+    next_sector = blk.uint8(1)
+    offset = 0
+    loop do
+      entries << blk[offset,32] if blk.uint8(offset+2)&0xf == FILE_TYPE_PRG
+      offset += 32
+      if(offset > BLKSIZE)
+        offset = 0
+        break if next_track == 0
+        read_block(next_track, next_sector)
+      end
+    end
+    entries
+  end
+
+  def read_block(track, sector)
+    read_disk
+    @d64[block(track, sector)*BLKSIZE,BLKSIZE]
+  end
+
+  def block(track, sector)
+    block = 0
+    return sector if track == 1
+    (track-1).downto(1) do |tr|
+      block += SECTORS[tr-1]
+    end
+    block += sector
+  end
+
+  def read_disk
+    if(!@d64)
+      File.open(@path, "rb") do |f|
+        @d64 = f.read
+      end
+    end
+    STDERR.puts("DEBUG: Invalid size: #{@d64.size}") if @d64.size != 174848
   end
 end

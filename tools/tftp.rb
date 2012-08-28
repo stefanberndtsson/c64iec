@@ -265,8 +265,8 @@ class TFTP
         },
         {
           :id => 9,
-          :path => "/var/tmp/c64iecd/9",
-          :type => :dir
+          :path => "/var/tmp/c64iecd/9/THEYSTOL.D64",
+          :type => :d64
         },
         {
           :id => 10,
