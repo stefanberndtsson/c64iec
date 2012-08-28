@@ -9,6 +9,12 @@
 #define AVR_DEBUG A1
 #define AVR_TIMEOUT A2
 
+/* if defined, accept device 8-15, if not only 8
+ * 
+ * if multi, prepend <devicenum-HEX>/ before path to tftp
+ */
+#define MULTIDEVICE 1
+
 #define IEC_COMMAND  0xf0
 #define IEC_DEVICE   0x0f
 #define IEC_UNTALK   0x50
@@ -73,8 +79,15 @@ void create_tftp_filename(uchar *c64name) {
       tftp_filename[out_pos+2] = hexarray[c64name[i]&0xf];
     }
   }
+#if MULTIDEVICE
+  memmove(tftp_filename+2, &tftp_filename[out_pos], out_size-out_pos);
+  tftp_filename[0] = hexarray[device_mode&0xf];
+  tftp_filename[1] = '/';
+  tftp_filename[out_size-out_pos+2] = '\0';
+#else
   memmove(tftp_filename, &tftp_filename[out_pos], out_size-out_pos);
   tftp_filename[out_size-out_pos] = '\0';
+#endif
   //  tftp_filename[out_size-out_pos+1] = 'p';
   //  tftp_filename[out_size-out_pos+2] = '0';
   //  tftp_filename[out_size-out_pos+3] = '0';
@@ -477,6 +490,17 @@ void handle_atn() {
     wait_atn(HIGH);
     return;
   } else if(mode == IEC_LISTEN) {
+#if MULTIDEVICE
+    if(device & IEC_DEVICE < 8 || device & IEC_DEVICE > 15) {
+      /* Not our device */
+      release_clock();
+      release_data();
+      Serial.println("LISTEN: Not our device");
+      Serial.print("Mode/Device: ");
+      Serial.println(device_mode, HEX);
+      return;
+    }
+#else
     if(DEVNO != (device & IEC_DEVICE)) {
       /* Not our device */
       release_clock();
@@ -486,7 +510,17 @@ void handle_atn() {
       Serial.println(device_mode, HEX);
       return;
     }
+#endif
   } else if(mode == IEC_TALK) {
+#if MULTIDEVICE
+    if(device & IEC_DEVICE < 8 || device & IEC_DEVICE > 15) {
+      /* Not our device */
+      release_clock();
+      release_data();
+      Serial.println("TALK: Not our device");
+      return;
+    }
+#else
     if(DEVNO != (device & IEC_DEVICE)) {
       /* Not our device */
       release_clock();
@@ -494,6 +528,7 @@ void handle_atn() {
       Serial.println("TALK: Not our device");
       return;
     }
+#endif
   }
 
   delayMicroseconds(200);
