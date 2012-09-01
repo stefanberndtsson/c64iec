@@ -234,7 +234,12 @@ end
 class DeviceD64 < Device
   BLKSIZE=256
   SECTORS=[21]*17 + [19]*7 + [18]*6 + [17]*10
+  FILE_TYPE_NAME=["DEL", "SEQ", "PRG", "USR", "REL"]
+  FILE_TYPE_DEL=0
+  FILE_TYPE_SEQ=1
   FILE_TYPE_PRG=2
+  FILE_TYPE_USR=3
+  FILE_TYPE_REL=4
 
   def open(filename, mode = :read)
     read_disk
@@ -247,7 +252,15 @@ class DeviceD64 < Device
   end
 
   def directory
+    @dir_addr = 0x0801
     entries = collect_directory_entries(18, 1)
+    bam = read_block(18, 0)
+    dir_data = dir_header(bam)
+    entries.each do |entry|
+      dir_data += dir_entry(entry)
+    end
+    dir_data += dir_footer(bam)
+    dir_data
   end
 
   def collect_directory_entries(track, sector)
@@ -259,13 +272,55 @@ class DeviceD64 < Device
     loop do
       entries << blk[offset,32] if blk.uint8(offset+2)&0xf == FILE_TYPE_PRG
       offset += 32
-      if(offset > BLKSIZE)
+      if(offset >= BLKSIZE)
         offset = 0
         break if next_track == 0
-        read_block(next_track, next_sector)
+        blk = read_block(next_track, next_sector)
+        next_track = blk.uint8(0)
+        next_sector = blk.uint8(1)
       end
     end
     entries
+  end
+
+  def dir_entry(entry)
+    dent = ""
+    dent += [@dir_addr].pack("v")
+    dent += entry[0x1e,2]
+    off_b = 1
+    off_b += 1 if(entry.le_uint16(0x1e) < 100)
+    off_b += 1 if(entry.le_uint16(0x1e) < 10)
+    @dir_addr += 26+off_b
+    dent += " "*off_b
+    name = "\"#{entry[5,16]}\"".gsub(/(\xA0*)\"/,'"\1').gsub(/\xA0/," ")
+    dent += " #{name} "
+    dent += " #{FILE_TYPE_NAME[entry.uint8(2)&0xf]} \x00"
+    dent
+  end
+
+  def dir_footer(bam)
+    footer = ""
+    free = 0
+    35.times do |tr|
+      next if tr == 17        # Directory track
+      free += bam[4+4*tr].uint8
+    end
+    footer += [@dir_addr].pack("v")
+    footer += [free].pack("v")
+    footer += "BLOCKS FREE.\x00\x00\x00"
+    footer
+  end
+
+  def dir_header(bam)
+    header = ""
+    header += [@dir_addr].pack("v")
+    @dir_addr += 16
+    header += [@dir_addr].pack("v")
+    header += [0].pack("v")
+    header += "\x12\""
+    header += bam[0x90,16]
+    header += "\"\x00"
+    header
   end
 
   def read_block(track, sector)
