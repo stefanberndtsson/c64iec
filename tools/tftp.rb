@@ -259,12 +259,12 @@ class TFTP
       :port => 53280,
       :devices => [
         {
-          :id => 8,
+          :id => 9,
           :path => "/var/tmp/c64iecd/8",
           :type => :dir
         },
         {
-          :id => 9,
+          :id => 8,
           :path => "/var/tmp/c64iecd/9/THEYSTOL.D64",
           :type => :d64
         },

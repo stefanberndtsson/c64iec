@@ -16,7 +16,11 @@ class C64File
   end
 
   def decode
-    @encoded.gsub(/%([a-fA-F0-9]{2})/) do |match|
+    C64File.decode(@encoded)
+  end
+
+  def self.decode(encoded)
+    encoded.gsub(/%([a-fA-F0-9]{2})/) do |match|
       match = [$1].pack("H2")
     end.gsub(/^@\d:/,'')
   end
@@ -233,6 +237,8 @@ class DeviceDir < Device
 end
 
 class DeviceD64 < Device
+  attr_accessor :file
+
   BLKSIZE=256
   SECTORS=[21]*17 + [19]*7 + [18]*6 + [17]*10
   FILE_TYPE_NAME=["DEL", "SEQ", "PRG", "USR", "REL"]
@@ -243,11 +249,18 @@ class DeviceD64 < Device
   FILE_TYPE_REL=4
 
   def open(filename, mode = :read)
+    if(C64File.decode(filename) == "$")
+      @file = StringIO.new(directory)
+      STDERR.puts("DEBUG: Created directory: #{@file}")
+      return true
+    end
+
     file_entry = find_file(filename)
     return nil if !file_entry
     start_track = file_entry.uint8(3)
     start_sector = file_entry.uint8(4)
     @file = StringIO.new(read_data(start_track, start_sector))
+    return true
   end
 
   def find_file(filename)
@@ -355,7 +368,7 @@ class DeviceD64 < Device
       next_track = tmp.uint8(0)
       next_sector = tmp.uint8(1)
       if(next_track == 0)
-        blk += tmp[2,next_sector]
+        blk += tmp[2..next_sector]
         return blk
       else
         blk += tmp[2,BLKSIZE-2]
