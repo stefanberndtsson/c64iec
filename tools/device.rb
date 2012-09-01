@@ -1,3 +1,4 @@
+require 'stringio'
 require 'common'
 
 class C64File
@@ -110,6 +111,14 @@ class Device
     return DeviceDir.new(id, path, type, false) if type == :dir
     return DeviceD64.new(id, path, type, true) if type == :d64
   end
+
+  def rewrite_filename(filename)
+    reduced = filename.gsub(/[\x00\xa0 ]*$/,"")
+#    STDERR.puts("DEBUG: reduced: #{reduced.inspect}")
+    tmp = [reduced," "*(C64File::PC64_FILENAME_SIZE-reduced.size)]
+#    STDERR.puts("DEBUG: returned: #{tmp.inspect}")
+    tmp
+  end
 end
 
 class DeviceDir < Device
@@ -216,14 +225,6 @@ class DeviceDir < Device
     entry
   end
 
-  def rewrite_filename(filename)
-    reduced = filename.gsub(/[\x00\xa0 ]*$/,"")
-    STDERR.puts("DEBUG: reduced: #{reduced.inspect}")
-    tmp = [reduced," "*(C64File::PC64_FILENAME_SIZE-reduced.size)]
-    STDERR.puts("DEBUG: returned: #{tmp.inspect}")
-    tmp
-  end
-
   def dir_footer
     footer = [@addr].pack("v")
     footer += "\xff\xffBLOCKS FREE.\x00\x00\x00"
@@ -242,13 +243,34 @@ class DeviceD64 < Device
   FILE_TYPE_REL=4
 
   def open(filename, mode = :read)
-    read_disk
+    file_entry = find_file(filename)
+    return nil if !file_entry
+    start_track = file_entry.uint8(3)
+    start_sector = file_entry.uint8(4)
+    @file = StringIO.new(read_data(start_track, start_sector))
   end
 
+  def find_file(filename)
+    read_disk
+    req_filename = rewrite_filename(filename).first
+    entries = collect_directory_entries(18, 1)
+    entries.each do |entry|
+      entry_name = rewrite_filename(entry[5,16]).first
+      return entry if entry_name == req_filename
+    end
+    return nil
+ end
+
   def read(bytes)
+    @file.read(bytes)
   end
 
   def close
+    @file.close
+  end
+
+  def eof?
+    @file.eof?
   end
 
   def directory
@@ -260,6 +282,7 @@ class DeviceD64 < Device
       dir_data += dir_entry(entry)
     end
     dir_data += dir_footer(bam)
+    # "C64File\x00DIRECTORY"+"\x00"*9+
     dir_data
   end
 
@@ -321,6 +344,23 @@ class DeviceD64 < Device
     header += bam[0x90,16]
     header += "\"\x00"
     header
+  end
+
+  def read_data(start_track, start_sector)
+    blk = ""
+    next_track = start_track
+    next_sector = start_sector
+    loop do
+      tmp = read_block(next_track, next_sector)
+      next_track = tmp.uint8(0)
+      next_sector = tmp.uint8(1)
+      if(next_track == 0)
+        blk += tmp[2,next_sector]
+        return blk
+      else
+        blk += tmp[2,BLKSIZE-2]
+      end
+    end
   end
 
   def read_block(track, sector)
