@@ -249,7 +249,8 @@ class DeviceD64 < Device
   FILE_TYPE_REL=4
 
   def open(filename, mode = :read)
-    if(C64File.decode(filename) == "$")
+    filename = C64File.decode(filename)
+    if(filename == "$")
       @file = StringIO.new(directory)
       STDERR.puts("DEBUG: Created directory: #{@file}")
       return true
