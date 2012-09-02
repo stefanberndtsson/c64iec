@@ -436,13 +436,13 @@ int recv_file() {
 }
 
 void handle_listen(uchar sec_addr) {
-  Serial.print("Mode/Device: ");
-  Serial.println(device_mode, HEX);
-  Serial.print("Secondary: ");
-  Serial.println(secondary, HEX);
-  Serial.print("Filename: ");
-  Serial.println((char *)iobuf);
   if(sec_addr != 1) {
+    Serial.print("Mode/Device: ");
+    Serial.println(device_mode, HEX);
+    Serial.print("Secondary: ");
+    Serial.println(secondary, HEX);
+    Serial.print("Filename: ");
+    Serial.println((char *)iobuf);
     Serial.println("TODO: SAVE only for now!");
     // Only supporting SAVE
     return;
@@ -458,13 +458,14 @@ void handle_listen(uchar sec_addr) {
 
 void handle_talk(uchar sec_addr) {
   int eoi = 0;
-  
-  Serial.print("Mode/Device: ");
-  Serial.println(device_mode, HEX);
-  Serial.print("Secondary: ");
-  Serial.println(secondary, HEX);
-  Serial.print("Filename: ");
+
+  Serial.print("Mode/Device/Secondary: ");
+  Serial.println(device_mode<<8|secondary, HEX);
+  //  Serial.print("Secondary: ");
+  //  Serial.println(secondary, HEX);
+  //  Serial.print("Filename: ");
   Serial.println((char *)iobuf);
+
   create_tftp_filename(iobuf);
 
   if(!send_file()) {
