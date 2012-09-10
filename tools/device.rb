@@ -222,8 +222,9 @@ class DeviceDir < Device
     entry += " "*b
     filename,padding = rewrite_filename(filename)
     entry += "\"#{filename}\""
-    entry += " "*(20-b-filename.size)
+    entry += " "*(17-filename.size)
     entry += " PRG "
+    entry += " "*(3-b)
     entry += "\x00"
     entry
   end
