@@ -129,7 +129,7 @@ class DeviceDir < Device
   BLKSIZE=256
 
   def exist?
-    return true if(@c64file.c64 == "$")
+    return true if(@c64file.c64[0] == "$")
     STDERR.puts("DEBUG: exist?(), local: #{@c64file.local.inspect}")
     !!@c64file.local
   end
@@ -142,7 +142,7 @@ class DeviceDir < Device
 
   def open_read
     return false if(!exist?)
-    if(@c64file.c64 == "$")
+    if(@c64file.c64[0] == "$")
       @file = StringIO.new(directory(@path))
       return true
     end
