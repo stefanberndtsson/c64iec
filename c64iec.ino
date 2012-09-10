@@ -46,7 +46,7 @@ byte secondary = 0;
 // ethernet interface mac address
 static byte mymac[] = { 0x42,0x42,0x42,0x01,0x02,0x03 };
 
-byte Ethernet::buffer[500];
+byte Ethernet::buffer[400];
 static long timer;
 static int dhcp_active = 0;
 
@@ -220,6 +220,12 @@ static inline int wait_data(int state) {
   return 1;
 }
 
+static inline int wait_data_inf(int state) {
+  pinMode(DATA, INPUT);
+  while(digitalRead(DATA) != state);
+  return 1;
+}
+
 int get_byte(uchar *output, int force_eoi) {
   int eoi = 0;
   int time_first;
@@ -300,7 +306,7 @@ int put_byte(uchar value, int eoi) {
   tmp = data_active();
   push_clock();
   if(tmp) {
-    if(!wait_data(HIGH)) return 0;
+    if(!wait_data_inf(HIGH)) return 0;
     flag = eoi;
   } else {
     flag = 1;
