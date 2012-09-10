@@ -180,12 +180,9 @@ static inline int wait_atn(int state) {
 static inline int wait_clock(int state) {
   pinMode(CLOCK, INPUT);
   int count = 0;
-  digitalWrite(AVR_DEBUG, HIGH);
   while(digitalRead(CLOCK) != state) {
     count++;
     if(count > TIMEOUT_COUNT) {
-      digitalWrite(AVR_DEBUG, LOW);
-      digitalWrite(AVR_TIMEOUT, HIGH);
       return 0;
     }
   }
@@ -195,12 +192,9 @@ static inline int wait_clock(int state) {
 static inline int wait_clock_eoi(int state) {
   pinMode(CLOCK, INPUT);
   int count = 0;
-  digitalWrite(AVR_DEBUG, HIGH);
   while(digitalRead(CLOCK) != state) {
     count++;
     if(count > TIMEOUT_COUNT/100) {
-      digitalWrite(AVR_DEBUG, LOW);
-      digitalWrite(AVR_TIMEOUT, HIGH);
       return 0;
     }
   }
@@ -213,7 +207,6 @@ static inline int wait_data(int state) {
   while(digitalRead(DATA) != state) {
     count++;
     if(count > TIMEOUT_COUNT) {
-      digitalWrite(AVR_TIMEOUT, HIGH);
       return 0;
     }
   }
@@ -233,13 +226,9 @@ int get_byte(uchar *output, int force_eoi) {
   if(!wait_clock(HIGH)) return 0;
   release_data();
   if(!wait_data(HIGH)) return 0;
-  digitalWrite(AVR_EOI, LOW);
-  digitalWrite(AVR_EOI, HIGH);
-  digitalWrite(AVR_EOI, LOW);
 
   if(!force_eoi) {
     if(!wait_clock_eoi(LOW)) {
-      digitalWrite(AVR_EOI, HIGH);
       eoi = 1;
       push_data();
       delayMicroseconds(80);
@@ -251,8 +240,6 @@ int get_byte(uchar *output, int force_eoi) {
     eoi = 1;
   }
   
-  digitalWrite(AVR_TIMEOUT, LOW);
-
   if(!wait_clock(LOW)) return 0;
   
   if(!wait_clock(HIGH)) return 0;
