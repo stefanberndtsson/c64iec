@@ -182,14 +182,19 @@ class DeviceDir < Device
   end
 
   def directory(path)
-    @addr = 0x0801
+    @addr = 0x0401
     dir_data = dir_header
+#    STDERR.puts("DEBUG: header: #{dir_data.size}")
     return dir_data+dir_footer if !Pathname.new(path).exist?
     Pathname.new(path).each_child do |child|
       next if !child.file? || child.extname.downcase != ".p00"
-      dir_data += dir_entry(child)
+      tmp = dir_entry(child)
+#      STDERR.puts("DEBUG: entry: #{tmp.size}")
+      dir_data += tmp
     end
-    dir_data += dir_footer
+    tmp = dir_footer
+#    STDERR.puts("DEBUG: footer: #{tmp.size}")
+    dir_data += tmp
     return dir_data
   end
 
@@ -197,12 +202,11 @@ class DeviceDir < Device
     # Fake PC64 header
     header = "C64File\x00DIRECTORY\x00\x00\x00\x00\x00\x00\x00\x00\x00"
     header = ""
-    STDERR.puts("DEBUG: #{header.size}")
+#    STDERR.puts("DEBUG: #{header.size}")
     header += [@addr].pack("v")
     len = "DIRECTORY".size
-    @addr += len+5
-    header += [@addr].pack("v")
-    header += "\x00\x00\x12\"DIRECTORY\"\x00"
+    header += "\x01\x01"
+    header += "\x00\x00\x12\"DIRECTORY\"             \x00"
     header
   end
 
@@ -213,25 +217,20 @@ class DeviceDir < Device
     b = 1
     b += 1 if(size < 100)
     b += 1 if(size < 10)
-    @addr += 26+b
-    entry = [@addr].pack("v")
+    entry = "\x01\x01"
     entry += [size].pack("v")
     entry += " "*b
     filename,padding = rewrite_filename(filename)
     entry += "\"#{filename}\""
-    entry += padding
-    if(file.extname.downcase == ".p00")
-      entry += " PRG "
-    else
-      entry += " UKN "
-    end
+    entry += " "*(20-b-filename.size)
+    entry += " PRG "
     entry += "\x00"
     entry
   end
 
   def dir_footer
-    footer = [@addr].pack("v")
-    footer += "\xff\xffBLOCKS FREE.\x00\x00\x00"
+    footer = "\x01\x01"
+    footer += "\xff\xffBLOCKS FREE.             \x00\x00\x00"
     footer
   end
 end
