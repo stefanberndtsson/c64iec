@@ -221,7 +221,7 @@ class TFTP
         return nil
       end
     end
-    data,sender = @conn.recvfrom(@blksize)
+    data,sender = @conn.recvfrom(@blksize+4)
     STDERR.puts("DEBUG: ACK: data: #{data.inspect}")
     data
   end
@@ -235,7 +235,7 @@ class TFTP
         return nil
       end
     end
-    data,sender = @conn.recvfrom(@blksize)
+    data,sender = @conn.recvfrom(@blksize+4)
     STDERR.puts("DEBUG: DATA: data: #{data.size}")
     data
   end
@@ -285,7 +285,7 @@ class TFTP
     @udp.bind("0.0.0.0", @options[:port])
     loop do
       nil while not IO.select([@udp], nil, nil, 1)
-      data,sender = @udp.recvfrom(TFTP::BLKSIZE)
+      data,sender = @udp.recvfrom(TFTP::BLKSIZE+4)
       STDERR.puts("DEBUG: data: #{data.inspect}")
       tftp = TFTP.new(@udp, @devices, sender)
       tftp.packet(data)
